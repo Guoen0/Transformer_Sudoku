@@ -24,7 +24,7 @@ ret = agent.play(batch_size=512, run_type="test")
 right_ret = [d for d in ret if d['reward'] == 1]
 success = len(right_ret)/len(ret)
 
-# 观察正确答案中最长的几个
+# 观察正确答案中最长的2个序列
 max_lengths_answer_data = sorted(right_ret, key=lambda d: len(d['answer']), reverse=True)[:2]
 for data in max_lengths_answer_data:
     question = data['question']
