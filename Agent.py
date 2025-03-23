@@ -70,17 +70,17 @@ class Agent:
             
             # 评估
             if iteration % self.config['training']['num_show_play'] == 0:
-                print("--------------------------------")
-                _ret = self.play(batch_size=self.config['training']['batch_size'], run_type="training")
+                _ret = self.play(group=self.config['training']['batch_size'], run_type="training")
                 _rewards = [d['reward'] for d in _ret]
                 correct_rate = sum(1 for reward in _rewards if reward == 1) / len(_rewards) if len(_rewards) > 0 else 0
+                print("--------------------------------")
                 print(f"- 训练数据 - 正确率: {correct_rate:.3f}")
                 print("--------------------------------")
-                _ret = self.play(batch_size=self.config['training']['batch_size'], run_type="evaluation")
+                _ret = self.play(group=self.config['training']['batch_size'], run_type="evaluation", print_once=True)
                 _rewards = [d['reward'] for d in _ret]
                 correct_rate = sum(1 for reward in _rewards if reward == 1) / len(_rewards) if len(_rewards) > 0 else 0
+                print("--------------------------------")
                 print(f"- 评估数据 - 正确率: {correct_rate:.3f}")
-                self.play(batch_size=1, is_print=True,  run_type="evaluation")
                 print("--------------------------------")
 
     @tf.function(experimental_relax_shapes=True)
@@ -118,7 +118,6 @@ class Agent:
             logits = self.policy_model((questions, decoder_inputs), training=False)
             logits = logits[:, -1:, :]  # 只考虑最后一个时间步的预测 (batch_size, 1, vocab_size)
             logits = tf.squeeze(logits, axis=1)  # (batch_size, vocab_size)
-            
             scaled_logits = logits / self.current_temperature
             
             if exploration:
@@ -158,36 +157,63 @@ class Agent:
 
         return final_output
 
-    def play(self,batch_size=1,is_print=False, run_type="training", exploration=False):
+    def play(self,group=1, num_generations=1, is_print=False, print_once=False, run_type="test", exploration=False):
+        """
+        进行一批游戏。
+
+        正常RL训练阶段对每个 question 各探索 num_generations 次，
+        返回全部探索数据即 group*num_generations。
+        
+        Args:
+            group: 每批次的group数量
+            num_generations: 每个group的探索次数
+            is_print: 是否打印全部
+            print_once: 只打印当批中第1个
+            run_type: "test","training","evaluation"
+            exploration: 是否启用探索
+            
+        Returns:
+            [{'question', 'answer', 'reward'}]
+        """
 
         # sample questions
         questions = []
-
-        if run_type == "evaluation":
-            _data = random.sample(self.evaluation_data, batch_size)
+        if run_type == "test":
+            roll_new_data = self.env.roll_cold_start_data(group)
         elif run_type == "training":
-            _data = random.sample(self.training_data, batch_size)
-        elif run_type == "test":
-            _data = self.env.roll_cold_start_data(batch_size)
-            
-        for q in _data:
-            questions.append(q['question'])
-        questions_tensor = tf.convert_to_tensor(questions, dtype=tf.int64)
+            roll_new_data = random.sample(self.training_data, group)
+        elif run_type == "evaluation":
+            roll_new_data = random.sample(self.evaluation_data, min(group, len(self.evaluation_data)))
+
+        for q in roll_new_data:
+                questions.append(q['question'])
+        
+        # 每个 question 扩展 num_generations 次作为1批
+        if run_type == "training":
+            questions_flat = [q for q in questions for _ in range(num_generations)]
+        else:
+            questions_flat = questions
+        questions_tensor = tf.convert_to_tensor(questions_flat, dtype=tf.int64)
 
         # predict
         outputs = self.predict(questions_tensor, exploration=exploration)
+
+        # 从<END>截断
         processed_outputs = truncate_end(outputs, self.END_ID)
         
         # 环境交互
         rewards = []
         for i in range(len(processed_outputs)):
-            if is_print: print("预测tokens",processed_outputs[i])
-            reward = self.env.play(state_tokens=questions[i], action_tokens=processed_outputs[i], is_print=is_print)
+            can_print = is_print
+            if i == 0 and print_once == True:
+                can_print = True
+            if can_print: print("预测tokens",processed_outputs[i])
+            reward = self.env.play(state_tokens=questions_flat[i], action_tokens=processed_outputs[i], is_print=can_print)
             rewards.append(reward)
         
         # 组合数据
         data = []
         for i in range(len(processed_outputs)):
-            data.append({'question': questions[i], 'answer': processed_outputs[i], 'reward': rewards[i]})
+            data.append({'question': questions_flat[i], 'answer': processed_outputs[i], 'reward': rewards[i]})
 
         return data

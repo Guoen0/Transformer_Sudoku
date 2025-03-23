@@ -3,6 +3,10 @@ import tensorflow as tf
 import yaml
 
 def get_padded_batch_data(data_1,data_2,batch_size,data_ratio,PAD_ID,START_ID,END_ID,max_length=500):
+    """
+    data_ratio=0时全部采样data_1,data_1的采样方式是顺序采样列表前batch_size个；
+    data_ratio=1时全部采样data_2,data_2的采样方式是随机采样batch_size个；
+    """
     # 采样1批数据
     data_2_size = int(batch_size * data_ratio)
     data_1_size = batch_size - data_2_size
@@ -13,7 +17,7 @@ def get_padded_batch_data(data_1,data_2,batch_size,data_ratio,PAD_ID,START_ID,EN
     
     # 安全采样
     data_2_sample = random.sample(data_2, data_2_size) if data_2_size > 0 else []
-    data_1_sample = random.sample(data_1, data_1_size) if data_1_size > 0 else []
+    data_1_sample = data_1[:data_1_size] if data_1_size > 0 else []
     data_1_sample = data_1_sample + data_2_sample
 
     encoder_inputs = [record["question"] for record in data_1_sample]

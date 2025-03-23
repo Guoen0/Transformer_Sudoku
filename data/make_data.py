@@ -29,7 +29,6 @@ env = SudokuEnv(size=9)
 evaluate_data = env.roll_cold_start_data(5000)
 with open("data/evaluation_data_9x5k.pkl", "wb") as f:
     pickle.dump(evaluate_data, f)
-
 training_data = env.roll_cold_start_data(100000)
 with open("data/training_data_9x100k.pkl", "wb") as f:
     pickle.dump(training_data, f)

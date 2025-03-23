@@ -264,22 +264,22 @@ class SudokuEnv:
             return reward
         else:
             if is_print: print("失败...")
-            #reward = -1
-            reward = round(reward * 0.5 - 0.5, 3)
+            reward = -1
+            #reward = round(reward * 0.5 - 0.5, 3)
             return reward
 
     def render(self, board=None):
         """打印当前数独棋盘"""
         if board is None: board = self.board
 
-        print("------")
+        print("----------↓")
         for i in range(self.size):
             for j in range(self.size):
                 if j == self.size - 1:
                     print(board[i][j])
                 else:
                     print(str(board[i][j]) + " ", end="")
-        print("------")
+        print("----------↑")
 
     def get_state_tokens(self, board=None):
         if board is None: board = self.board

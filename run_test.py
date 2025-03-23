@@ -20,7 +20,7 @@ agent.policy_model.load_weights(f"models/policy_model_{suffix}.h5")
 agent.policy_model.summary()
 
 # 测试
-ret = agent.play(batch_size=512, run_type="test")
+ret = agent.play(group=512, run_type="test")
 right_ret = [d for d in ret if d['reward'] == 1]
 success = len(right_ret)/len(ret)
 
